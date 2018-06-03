@@ -12,7 +12,7 @@ import AddChannel from './AddChannel';
 
 const ChannelsList = ({ data: {loading, error, channels }}) => {
   if (loading) {
-    return <p>Loading ...</p>;
+    return <p>Loading...</p>;
   }
   if (error) {
     return <p>{error.message}</p>;
