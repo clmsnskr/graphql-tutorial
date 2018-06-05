@@ -8,6 +8,15 @@ import {
     graphql,
 } from 'react-apollo';
 
+const messagesSubscription = gql`
+  subscription messageAdded($channelId: ID!) {
+    messageAdded(channelId: $channelId) {
+      id
+      text
+    }
+  }
+`
+
 class ChannelDetails extends Component {
   componentWillMount() {
     this.props.data.subscribeToMore({
@@ -25,7 +34,9 @@ class ChannelDetails extends Component {
         if (!prev.channel.messages.find((msg) => msg.id === newMessage.id)) {
           return Object.assign({}, prev, {
             channel: Object.assign({}, prev.channel, {
-              messages: [...prev.channel.messages, newMessage],
+              messageFeed: {
+                messages: [...prev.channel.messageFeed.messages, newMessage],
+              }
             })
           });
         } else {
@@ -48,36 +59,33 @@ class ChannelDetails extends Component {
     }
     return (
       <div>
+        <button onClick={loadOlderMessages}>
+          Load Older Messages
+        </button>
         <div className="channelName">
           {channel.name}
         </div>
-        <MessageList messages={channel.messages}/>
+        <MessageList messages={channel.messageFeed.messages}/>
       </div>
     );
   }
 }
 
 export const channelDetailsQuery = gql`
-  query ChannelDetailsQuery($channelId : ID!) {
+  query ChannelDetailsQuery($channelId: ID!, $cursor: String) {
     channel(id: $channelId) {
       id
       name
-      messages {
-        id
-        text
+      messageFeed(cursor: $cursor) @connection(key: "messageFeed") {
+        cursor
+        messages {
+          id
+          text
+        }
       }
     }
   }
 `;
-
-const messagesSubscription = gql`
-  subscription messageAdded($channelId: ID!) {
-    messageAdded(channelId: $channelId) {
-      id
-      text
-    }
-  }
-`
 
 export default (graphql(channelDetailsQuery, {
   options: (props) => ({
@@ -85,4 +93,39 @@ export default (graphql(channelDetailsQuery, {
       channelId: props.match.params.channelId,
     },
   }),
+
+  props: (props) => {
+    return {
+      data: props.data,
+      loadOlderMessages: () => {
+        return props.data.fetchMore({
+          variables: {
+            channelId: props.data.channel.id,
+            cursor: props.data.channel.messageFeed.cursor
+          },
+          updateQuery(previousResult, { fetchMoreResult }) {
+            const prevMessageFeed = previousResult.channel.messageFeed;
+            const newMessageFeed = fetchMoreResult.channel.messageFeed;
+
+            const newChannelData = {...previousResult.channel,
+              messageFeed: {
+                messages: [
+                  ...newMessageFeed.messages,
+                  ...prevMessageFeed.messages
+                ],
+                cursor: newMessageFeed.cursor
+              }
+            }
+
+            const newData = {
+              ...previousResult,
+              channel: newChannelData
+            }
+
+            return newData;
+          }
+        })
+      }
+    }
+  }
 })(ChannelDetails));

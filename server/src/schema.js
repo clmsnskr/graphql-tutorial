@@ -7,6 +7,7 @@ type Channel {
   id: ID!                # "!" denotes a required field
   name: String
   messages: [Message]
+  messageFeed(cursor: String): MessageFeed
 }
 
 input MessageInput{
@@ -17,6 +18,12 @@ input MessageInput{
 type Message {
   id: ID!
   text: String
+  createAt: Int
+}
+
+type MessageFeed {
+  cursor: String!
+  messages: [Message]!
 }
 
 # This type specifies the entry points into our API
